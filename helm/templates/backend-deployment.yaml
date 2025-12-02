@@ -40,10 +40,10 @@ spec:
           ports:
             - containerPort: {{ .Values.service.backend.port }}
               protocol: TCP
-      restartPolicy: Always
           volumeMounts:
             - name: backend-data
               mountPath: /app/data
+      restartPolicy: Always
       volumes:
         - name: backend-data
           persistentVolumeClaim:
