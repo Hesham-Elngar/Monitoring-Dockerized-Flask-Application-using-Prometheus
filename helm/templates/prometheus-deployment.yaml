@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: prometheus
+  name: prometheus
+spec:
+  replicas:  {{ .Values.replicaCount.prometheus }}
+  selector:
+    matchLabels:
+      io.kompose.service: prometheus
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        io.kompose.service: prometheus
+    spec:
+      containers:
+        - args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time=200h
+            - --web.enable-lifecycle
+          image: {{ .Values.image.prometheus.repository }}:{{ .Values.image.prometheus.tag }}
+          name: prometheus
+          ports:
+            - containerPort: {{ .Values.service.prometheus.port }}
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/prometheus/prometheus.yml
+              name: prometheus-cm0
+              subPath: prometheus.yml
+            - mountPath: /etc/prometheus/alerts.yml
+              name: prometheus-cm1
+              subPath: alerts.yml
+            - mountPath: /prometheus
+              name: prometheus-data
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            items:
+              - key: prometheus.yml
+                path: prometheus.yml
+            name: prometheus-cm0
+          name: prometheus-cm0
+        - configMap:
+            items:
+              - key: alerts.yml
+                path: alerts.yml
+            name: prometheus-cm1
+          name: prometheus-cm1
+        - name: prometheus-data
+          persistentVolumeClaim:
+            claimName: prometheus-data

@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: backend
+  name: backend
+spec:
+  replicas: {{ .Values.replicaCount.backend }}
+  selector:
+    matchLabels:
+      io.kompose.service: backend
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.version: 1.37.0 (fb0539e64)
+      labels:
+        io.kompose.service: backend
+    spec:
+      containers:
+        - name: backend
+          image: {{ .Values.image.backend.repository }}:{{ .Values.image.backend.tag }}
+
+          env:
+            - name: FLASK_ENV
+              value: {{ .Values.env.FLASK_ENV }}
+
+          envFrom:
+            - configMapRef:
+                name: env
+
+          ports:
+            - containerPort: {{ .Values.service.backend.port }}
+              protocol: TCP
+
+          livenessProbe:
+            exec:
+              command: ["curl", "-f", "http://localhost:5000/health"]
+            initialDelaySeconds: 40
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+
+          volumeMounts:
+            - name: backend-data
+              mountPath: /app/data
+
+      restartPolicy: Always
+
+      volumes:
+        - name: backend-data
+          persistentVolumeClaim:
+            claimName: backend-pvc
+

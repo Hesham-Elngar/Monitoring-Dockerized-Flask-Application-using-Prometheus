@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: frontend
+  name: frontend
+spec:
+  replicas: {{ .Values.replicaCount.frontend }}
+  selector:
+    matchLabels:
+      io.kompose.service: frontend
+  template:
+    metadata:
+      labels:
+        io.kompose.service: frontend
+    spec:
+      containers:
+        - image: {{ .Values.image.frontend.repository }}:{{ .Values.image.frontend.tag }}
+          livenessProbe:
+            exec:
+              command:
+                - curl
+                - -f
+                - http://localhost/health
+            failureThreshold: 3
+            periodSeconds: 30
+            timeoutSeconds: 10
+          name: frontend
+          ports:
+            - containerPort: {{ .Values.service.frontend.port }}
+              protocol: TCP
+      restartPolicy: Always

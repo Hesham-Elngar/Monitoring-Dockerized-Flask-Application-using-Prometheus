@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    io.kompose.service: alertmanager
+  name: alertmanager
+spec:
+  replicas: {{ .Values.replicaCount.alertmanager }}
+  selector:
+    matchLabels:
+      io.kompose.service: alertmanager
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        io.kompose.service: alertmanager
+    spec:
+      containers:
+        - args:
+            - --config.file=/etc/alertmanager/alertmanager.yml
+            - --storage.path=/alertmanager
+          image: {{ .Values.image.alertmanager.repository }}:{{ .Values.image.alertmanager.tag }}
+          name: alertmanager
+          ports:
+            - containerPort: {{ .Values.service.alertmanager.port }}
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/alertmanager/alertmanager.yml
+              name: alertmanager-cm0
+              subPath: alertmanager.yml
+            - mountPath: /alertmanager
+              name: alertmanager-data
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            items:
+              - key: alertmanager.yml
+                path: alertmanager.yml
+            name: alertmanager-cm0
+          name: alertmanager-cm0
+        - name: alertmanager-data
+          persistentVolumeClaim:
+            claimName: alertmanager-data
