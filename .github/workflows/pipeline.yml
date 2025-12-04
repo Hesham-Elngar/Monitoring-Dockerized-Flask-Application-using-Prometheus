@@ -142,11 +142,11 @@ jobs:
           cd /home/ec2-user/url-shortener
           
           cat > .env << EOT
-          ${{ env.DOT_ENV }}
+          $DOT_ENV
           EOT
           
           cat > docker-compose.yml << EOT
-          ${{ env.DOCKER_COMPOSE_YML }}
+          $DOCKER_COMPOSE_YML
           EOT          
           docker-compose pull && docker-compose up -d
           docker ps
