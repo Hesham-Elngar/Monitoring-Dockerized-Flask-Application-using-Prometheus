@@ -1,0 +1,20 @@
+name: 'Generate Docker Tag'
+description: 'Generate next Docker image tag from git tags'
+outputs:
+  new_tag:
+    description: 'Generated Docker tag'
+    value: ${{ steps.generate.outputs.new_tag }}
+
+runs:
+  using: composite
+  steps:
+    - name: Generate Docker image tag
+      id: generate
+      shell: bash
+      run: |
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+        IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST_TAG#v}"
+        PATCH=$((PATCH + 1))
+        NEW_TAG="v$MAJOR.$MINOR.$PATCH"
+        echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+        echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV

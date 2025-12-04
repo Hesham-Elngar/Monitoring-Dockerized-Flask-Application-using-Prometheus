@@ -32,37 +32,19 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Generate Docker image tag
         id: version
-        run: |
-          LATEST_TAG=$(git describe --tags --abbrev=0 || echo "v0.0.0")
-          IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST_TAG#v}"
-          PATCH=$((PATCH + 1))
-          NEW_TAG="v$MAJOR.$MINOR.$PATCH"
-          
-          echo "Generated new tag: $NEW_TAG"
-          
-          # Use new GITHUB_OUTPUT method (not deprecated)
-          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
-          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
-
+        uses: ./.github/actions/generate-tag
 
       - name: Configure AWS via OIDC
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/ecrAccessRole
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: Verify AWS credentials
-        run: |
-          echo "Testing AWS credentials..."
-          aws sts get-caller-identity
-          
-      - name: List ECR repositories
-        run: |
-          echo "Listing ECR repositories..."
-          aws ecr describe-repositories --region ${{ env.AWS_REGION }}
     
 
   ##################################
@@ -108,10 +90,14 @@ jobs:
     needs: build-backend
     steps:
       - uses: actions/checkout@v4
-      - name: Login to ECR
-        run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-          docker login --username AWS --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+
+      - name: AWS Setup with ECR Login
+        uses: ./.github/actions/aws-setup
+        with:
+          aws-account-id: ${{ env.AWS_ACCOUNT_ID }}
+          aws-region: ${{ env.AWS_REGION }}
+          ecr-login: true      
+
       - name: Push backend image
         run: |
           IMAGE=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/url-shortener-backend:${{ needs.setup.outputs.new_tag }}
@@ -128,10 +114,12 @@ jobs:
     needs: build-frontend
     steps:
       - uses: actions/checkout@v4
-      - name: Login to ECR
-        run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-          docker login --username AWS --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+      - name: AWS Setup with ECR Login
+        uses: ./.github/actions/aws-setup
+        with:
+          aws-account-id: ${{ env.AWS_ACCOUNT_ID }}
+          aws-region: ${{ env.AWS_REGION }}
+          ecr-login: true      
       - name: Push frontend image
         run: |
           IMAGE=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/url-shortener-frontend:${{ needs.setup.outputs.new_tag }}
@@ -195,7 +183,7 @@ jobs:
           curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
           sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
 
-      - name: test argocd
+      - name: test argocd cli
         run: argocd version
 
     # - name: ArgoCD Login
