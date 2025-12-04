@@ -54,6 +54,9 @@ jobs:
     name: Backend-Containerization
     runs-on: ubuntu-latest
     needs: setup
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Login to ECR
@@ -77,6 +80,9 @@ jobs:
     name: Frontend-Containerization
     runs-on: ubuntu-latest
     needs: setup
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Login to ECR
