@@ -145,6 +145,8 @@ jobs:
           ${{ vars.DOCKER_COMPOSE_YML }}
           EOT
           
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
           docker-compose pull
           docker-compose up -d --remove-orphans
           docker ps
@@ -177,7 +179,6 @@ jobs:
           helm upgrade --install url-shortener ./helm \
             -f ./helm/values.yaml \
             -n staging
-
 
   ##################################
   # 8️⃣  Deploy to Production       #
