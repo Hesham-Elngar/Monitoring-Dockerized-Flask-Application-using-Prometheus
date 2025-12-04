@@ -88,6 +88,8 @@ jobs:
     name: Push Backend Image
     runs-on: ubuntu-latest
     needs: build-backend
+    env: 
+      NEW_TAG: ${{ needs.setup.outputs.new_tag }}
     permissions:
       id-token: write
       contents: read
@@ -115,6 +117,8 @@ jobs:
     name: Push Frontend Image
     runs-on: ubuntu-latest
     needs: build-frontend
+    env: 
+      NEW_TAG: ${{ needs.setup.outputs.new_tag }}
     permissions:
       id-token: write
       contents: read
