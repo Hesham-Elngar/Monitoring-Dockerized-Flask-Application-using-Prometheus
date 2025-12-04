@@ -133,7 +133,7 @@ jobs:
             cat .env  docker-compose.yml
             docker-compose pull
             docker-compose up -d --remove-orphans
-           EOF
+            EOF
 
   ################################
   # 7️⃣ Deploy to Staging (EKS)  #
