@@ -126,7 +126,6 @@ jobs:
           
       - name: SSH & Deploy
         run: |
-
           echo "${{ secrets.DEV_EC2_SSH_KEY }}" > key.pem
           chmod 600 key.pem
           
