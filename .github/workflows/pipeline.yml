@@ -123,19 +123,17 @@ jobs:
 
           echo "${{ secrets.DEV_EC2_SSH_KEY }}" > key.pem
           chmod 600 key.pem
-      
+          
+          ssh -i key.pem ec2-user@${{ secrets.DEV_EC2_HOST }} "mkdir -p /home/ec2-user/url-shortener"
+          scp -i key.pem docker-compose.yml .env ec2-user@${{ secrets.DEV_EC2_HOST }}:/home/ec2-user/url-shortener/
+
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.DEV_EC2_HOST }} >> ~/.ssh/known_hosts
       
-          ssh -i key.pem ec2-user@${{ secrets.DEV_EC2_HOST }} << EOF
-          mkdir -p /home/ec2-user/url-shortener
+          ssh -i key.pem ec2-user@${{ secrets.DEV_EC2_HOST }} << EOF            
           cd /home/ec2-user/url-shortener
-          
-          echo ${{ vars.DOT_ENV }} > .env 
-  
-          echo ${{ vars.DOCKER_COMPOSE_YML }} > docker-compose.yml 
-          
-          docker-compose pull && docker-compose up -d
+          docker-compose pull
+          docker-compose up -d --remove-orphans
           docker ps
           EOF
                 
