@@ -161,7 +161,7 @@ jobs:
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
-    needs: [Frontend-Containerization, Backend-Containerization]
+    # needs: [Frontend-Containerization, Backend-Containerization]
     if: github.ref == 'refs/heads/staging'
     steps:
       - uses: actions/checkout@v4
@@ -187,7 +187,7 @@ jobs:
   deploy-prod:
     name: Deploy to Production (ArgoCD)
     runs-on: ubuntu-latest
-    needs: [Frontend-Containerization, Backend-Containerization]
+    # needs: [Frontend-Containerization, Backend-Containerization]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/prod'
     steps:
 
