@@ -65,6 +65,7 @@ jobs:
           aws-account-id: ${{ env.AWS_ACCOUNT_ID }}
           aws-region: ${{ env.AWS_REGION }}
           ecr-login: true
+
       - name: Build and Push Backend
         run: |
           IMAGE=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/url-shortener-backend:${{ needs.setup.outputs.new_tag }}
@@ -91,6 +92,7 @@ jobs:
           aws-account-id: ${{ env.AWS_ACCOUNT_ID }}
           aws-region: ${{ env.AWS_REGION }}
           ecr-login: true
+
       - name: Build frontend Docker image
         run: |
           IMAGE=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/url-shortener-frontend:${{ needs.setup.outputs.new_tag }}
@@ -98,6 +100,7 @@ jobs:
           docker tag $IMAGE ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/url-shortener-frontend:latest
           docker push $IMAGE
           docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/url-shortener-frontend:latest
+
 
   ###############################
   # 6️⃣ Deploy to Dev (EC2)      #
@@ -108,13 +111,12 @@ jobs:
     needs: [Frontend-Containerization, Backend-Containerization]
     if: github.ref == 'refs/heads/dev'
     steps:
+
       - name: Prepare deployment files
         run: |
-          DOCKER_COMPOSE="${{ env.DOCKER_COMPOSE_YML }}"
-          echo "${{ env.DOT_ENV }}" > .env
-          echo "$DOCKER_COMPOSE" > docker-compose.yml
-          
-          
+          echo "${{ secrets.DEV_DOT_ENV }}" > .env
+          echo "${{ secrets.DEV_DOCKER_COMPOSE }}" > docker-compose.yml
+
           echo "Generated docker-compose.yml:"
           cat docker-compose.yml
 
@@ -125,15 +127,16 @@ jobs:
           
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.DEV_EC2_HOST }} >> ~/.ssh/known_hosts
-      
+
           ssh -i /tmp/dev_key.pem ec2-user@${{ secrets.DEV_EC2_HOST }} << 'EOF'
-      cd /home/ec2-user/url-shortener
-      echo "${{ env.DOT_ENV }}" > .env
-      echo "${{ env.DOCKER_COMPOSE_YML }}" > docker-compose.yml
-      cat .env docker-compose.yml
-      docker-compose pull
-      docker-compose up -d --remove-orphans
-      EOF
+cd /home/ec2-user/url-shortener
+echo "${DEV_DOT_ENV}" > .env
+echo "${DEV_DOCKER_COMPOSE}" > docker-compose.yml
+cat .env docker-compose.yml
+docker-compose pull
+docker-compose up -d --remove-orphans
+EOF
+
 
   ################################
   # 7️⃣ Deploy to Staging (EKS)  #
@@ -148,14 +151,17 @@ jobs:
       - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
       - name: Create namespace
         run: |
           kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Deploy Helm
         run: |
           helm upgrade --install url-shortener ./helm \
             -f ./helm/values.yaml \
             -n staging
+
 
   ##################################
   # 8️⃣  Deploy to Production       #
@@ -166,26 +172,11 @@ jobs:
     needs: [Frontend-Containerization, Backend-Containerization]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/prod'
     steps:
-      
+
       - name: Install ArgoCD CLI
         run: |
           curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
           sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
 
-      - name: test argocd cli
+      - name: Test CLI
         run: argocd version --client
-
-    # - name: ArgoCD Login
-    #   run: |
-    #     argocd login ${{ secrets.ARGOCD_SERVER }} \
-    #       --username ${{ secrets.ARGOCD_USERNAME }} \
-    #       --password ${{ secrets.ARGOCD_PASSWORD }} \
-    #       --insecure
-    #     argocd app sync url-shortener
-    #     argocd app wait url-shortener
-
-    # - name: Sync Application
-    #   run: |
-    #     argocd app sync url-shortener
-    #     argocd app wait url-shortener
- 
