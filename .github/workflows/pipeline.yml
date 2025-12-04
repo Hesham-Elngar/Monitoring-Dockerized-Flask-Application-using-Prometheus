@@ -116,8 +116,8 @@ jobs:
 
       - name: Prepare deployment files
         run: |
-          echo "${{ env.DOT_ENV }}" > .env
-          echo "${{ env.DOCKER_COMPOSE_YML }}" > docker-compose.yml
+          echo "${{ secrets.DOT_ENV }}" > .env
+          echo "${{ secrets.DOCKER_COMPOSE_YML }}" > docker-compose.yml
 
           echo "Generated docker-compose.yml:"
           cat docker-compose.yml
@@ -138,9 +138,13 @@ jobs:
           mkdir -p /home/ec2-user/url-shortener
           cd /home/ec2-user/url-shortener
           
-          echo "${{ env.DOT_ENV }}" > .env
-          echo "${{ env.DOCKER_COMPOSE_YML }}" > docker-compose.yml
+          cat > .env << EOT
+          ${{ env.DOT_ENV }}
+          EOT
           
+          cat > docker-compose.yml << EOT
+          ${{ env.DOCKER_COMPOSE_YML }}
+          EOT          
           docker-compose pull && docker-compose up -d
           docker ps
           EOF
