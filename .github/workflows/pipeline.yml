@@ -156,7 +156,7 @@ jobs:
           sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
 
       - name: test argocd cli
-        run: argocd version
+        run: argocd version --client
 
     # - name: ArgoCD Login
     #   run: |
