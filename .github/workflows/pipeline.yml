@@ -13,10 +13,6 @@ on:
       - main
       - prod
 
-# env:
-#   AWS_REGION: ${{ env.AWS_REGION }}
-#   AWS_ACCOUNT_ID: ${{ env.AWS_ACCOUNT_ID }}
-
 jobs:
 
   #################################################
