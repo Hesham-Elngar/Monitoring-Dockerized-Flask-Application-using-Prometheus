@@ -46,10 +46,6 @@ jobs:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/ecrAccessRole
           aws-region: ${{ env.AWS_REGION }}
           
-      - name: jjo
-        run: echo ${{ secrets.EKS_CLUSTER_NAME }}
-    
-
   ##################################
   # 2️⃣ Backend-Containerization   #
   ##################################
@@ -117,6 +113,12 @@ jobs:
     if: github.ref == 'refs/heads/dev'
     steps:
       - uses: actions/checkout@v4
+ 
+      - name: Configure AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/ecrAccessRole
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: SSH & Deploy
         run: |
@@ -128,7 +130,7 @@ jobs:
           ssh-keyscan -H ${{ secrets.DEV_EC2_HOST }} >> ~/.ssh/known_hosts
       
           ssh -i key.pem ec2-user@${{ secrets.DEV_EC2_HOST }} << EOF   
-          mkdir -p 
+          mkdir -p /home/ec2-user/url-shortener
           cd /home/ec2-user/url-shortener
 
           cat > .env << EOT
