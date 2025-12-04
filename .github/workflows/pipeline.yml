@@ -103,7 +103,7 @@ jobs:
 
       - name: Push backend image
         run: |
-          IMAGE=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/url-shortener-backend:${{ needs.setup.outputs.new_tag }}
+          IMAGE=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/url-shortener-backend:${{ env.NEW_TAG }}
           docker tag $IMAGE ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/url-shortener-backend:latest
           docker push $IMAGE
           docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/url-shortener-backend:latest
@@ -128,7 +128,7 @@ jobs:
           ecr-login: true      
       - name: Push frontend image
         run: |
-          IMAGE=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/url-shortener-frontend:${{ needs.setup.outputs.new_tag }}
+          IMAGE=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/url-shortener-frontend:${{ env.NEW_TAG }}
           docker tag $IMAGE ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/url-shortener-frontend:latest
           docker push $IMAGE
           docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/url-shortener-frontend:latest
