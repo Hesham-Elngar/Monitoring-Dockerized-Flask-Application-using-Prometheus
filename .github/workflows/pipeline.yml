@@ -208,10 +208,16 @@ jobs:
 
       - name: Install kube-score
         run: |
-          curl -L https://github.com/zegl/kube-score/releases/latest/download/kube-score_amd64 -o kube-score
-          chmod +x kube-score
-          sudo mv kube-score /usr/local/bin/
-    
+          LATEST=$(curl -s https://api.github.com/repos/zegl/kube-score/releases/latest \
+            | grep browser_download_url \
+            | grep "linux_amd64$" \
+            | cut -d '"' -f 4)
+  
+            echo "Downloading: $LATEST"
+            curl -L "$LATEST" -o kube-score
+            chmod +x kube-score
+            sudo mv kube-score /usr/local/bin/
+        
 
       - name: Run kube-score
         run: |
