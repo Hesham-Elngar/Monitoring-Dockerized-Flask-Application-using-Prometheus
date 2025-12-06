@@ -36,7 +36,11 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-
+          
+      - name: Debug environment variables
+        run: |
+          echo "AWS_ACCOUNT_ID: $AWS_ACCOUNT_ID"
+          echo "AWS_REGION: $AWS_REGION"
       - name: Generate Docker image tag
         id: version
         uses: ./.github/actions/generate-tag
