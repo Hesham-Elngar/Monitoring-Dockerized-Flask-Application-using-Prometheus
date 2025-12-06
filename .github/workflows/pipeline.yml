@@ -171,13 +171,13 @@ jobs:
      
       - name: Install Helm
         uses: azure/setup-helm@v4
-          with:
-            version: 'latest'
-
+        with:
+          version: 'latest'
+      
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
-          with:
-            version: 'latest'
+        with:
+          version: 'latest'
           
       - name: Create namespace
         run: |
