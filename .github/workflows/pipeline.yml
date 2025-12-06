@@ -165,10 +165,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Update kubeconfig
-        run: |
-          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+      # Install KIND (local K8s cluster for testing)
+      - name: Create KIND Cluster
+        uses: helm/kind-action@v1.9.0
+     
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+          with:
+          version: 'latest'
 
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+          with:
+          version: 'latest'
+          
       - name: Create namespace
         run: |
           kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
