@@ -13,6 +13,7 @@ on:
       - main
       - prod
 
+
 env:
   AWS_REGION: eu-west-1
   AWS_ACCOUNT_ID: 488639172982
