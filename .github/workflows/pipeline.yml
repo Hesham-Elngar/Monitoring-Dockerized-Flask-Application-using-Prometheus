@@ -201,7 +201,14 @@ jobs:
         uses: azure/setup-helm@v4
         with:
           version: 'latest'
-  
+          
+      # create namespace 
+      - name: create namespace
+        run: |
+          if ! kubectl get ns staging; then 
+          kubectl create ns staging
+          fi
+          
       # Deploy Helm chart
       - name: Deploy Helm
         run: |
