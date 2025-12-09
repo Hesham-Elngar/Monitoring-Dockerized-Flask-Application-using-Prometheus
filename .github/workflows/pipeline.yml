@@ -277,7 +277,7 @@ jobs:
   # 8️⃣  Deploy to Production       #
   ##################################        
   deploy-prod:
-    name: Deploy to Production (ArgoCD)
+    name: Deploy to Production (ArgoCD in EKS)
     runs-on: ubuntu-latest
     needs: image-scan
     permissions:
@@ -286,16 +286,7 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/prod'
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install ArgoCD CLI v2 (NOT Core)
-        run: |
-          # Download ArgoCD v2 CLI
-          VERSION="v2.9.4"  # Use latest v2 version
-          curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/download/$VERSION/argocd-linux-amd64
-          chmod +x argocd
-          sudo mv argocd /usr/local/bin/
-          argocd version --client
-            # Update kubeconfig so kubectl can talk to your EKS cluster
+  
       - name: Configure AWS via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -318,75 +309,137 @@ jobs:
         with:
           version: 'latest'
           
-      # create namespace 
-      - name: create namespace
+      # Install ArgoCD in EKS
+      - name: Install ArgoCD in EKS
         run: |
-          if ! kubectl get ns prod; then 
-          kubectl create ns prod
+          # Check if ArgoCD already exists
+          if kubectl get ns argocd 2>/dev/null; then
+            echo "✅ ArgoCD namespace already exists"
+            # Update ArgoCD if needed
+            kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+          else
+            echo "🚀 Installing ArgoCD..."
+            kubectl create namespace argocd
+            kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
           fi
           
-      # Deploy Helm chart
-      - name: Deploy Helm
-        run: |
-          helm upgrade --install url-shortener ./helm \
-            -f ./helm/values.yaml \
-            -n prod
-  
-
-      - name: Deploy Application
-        env:
-          ARGOCD_URL: ${{ secrets.ARGOCD_URL }}
-          ARGOCD_PASS: ${{ secrets.ARGOCD_PASSWORD }}
-        run: |
-          # 1. Authenticate
-          echo "🔐 Authenticating..."
-          AUTH_RESPONSE=$(curl -k -s -X POST $ARGOCD_URL/api/v1/session \
-            -d "{\"username\":\"admin\",\"password\":\"$ARGOCD_PASS\"}" \
-            -H "Content-Type: application/json")
+          # Wait for ArgoCD server to be ready
+          echo "⏳ Waiting for ArgoCD to start..."
+          kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=300s
           
-          # Check if we got a valid response
-          if ! echo "$AUTH_RESPONSE" | jq -e '.token' > /dev/null 2>&1; then
-            echo "❌ Authentication failed"
-            echo "Response: $AUTH_RESPONSE"
+          # Get admin password
+          echo "🔐 ArgoCD admin password:"
+          kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+          echo ""
+          
+      # Create prod namespace and ECR credentials
+      - name: Setup prod namespace
+        run: |
+          # Create namespace
+          kubectl create namespace prod --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Create ECR secret for image pulling
+          kubectl delete secret ecr-registry -n prod --ignore-not-found
+          kubectl create secret docker-registry ecr-registry \
+            --docker-server=488639172982.dkr.ecr.eu-west-1.amazonaws.com \
+            --docker-username=AWS \
+            --docker-password=$(aws ecr get-login-password --region eu-west-1) \
+            --namespace=prod --dry-run=client -o yaml | kubectl apply -f -
+          
+      # Create/Update ArgoCD Application
+      - name: Create ArgoCD Application
+        run: |
+          cat > argocd-application.yaml <<EOF
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: url-shortener
+            namespace: argocd
+          spec:
+            project: default
+            source:
+              repoURL: 'https://github.com/Hesham-Elngar/ShortOps.git'
+              targetRevision: prod
+              path: helm
+              helm:
+                valueFiles:
+                  - values.yaml
+            destination:
+              server: 'https://kubernetes.default.svc'
+              namespace: prod
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+          EOF
+          
+          # Apply the application
+          kubectl apply -f argocd-application.yaml
+          
+          echo "✅ ArgoCD application created/updated"
+          
+      # Trigger and monitor sync
+      - name: Trigger and Monitor ArgoCD Sync
+        run: |
+          # Start port-forward to access ArgoCD API
+          echo "🔌 Starting port-forward to ArgoCD API..."
+          kubectl port-forward svc/argocd-server -n argocd 8080:443 &
+          PORT_FORWARD_PID=$!
+          sleep 5
+          
+          # Get ArgoCD admin password
+          ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+          
+          # Get JWT token
+          echo "🔐 Getting authentication token..."
+          JWT_RESPONSE=$(curl -k -s -X POST https://localhost:8080/api/v1/session \
+            -H "Content-Type: application/json" \
+            -d "{\"username\":\"admin\",\"password\":\"$ARGOCD_PASSWORD\"}")
+          
+          JWT_TOKEN=$(echo "$JWT_RESPONSE" | jq -r '.token')
+          
+          if [ -z "$JWT_TOKEN" ] || [ "$JWT_TOKEN" = "null" ]; then
+            echo "❌ Failed to get JWT token"
+            echo "Response: $JWT_RESPONSE"
+            kill $PORT_FORWARD_PID
             exit 1
           fi
           
-          TOKEN=$(echo "$AUTH_RESPONSE" | jq -r '.token')
-          echo "✅ Authenticated"
+          echo "✅ Authenticated with ArgoCD"
           
-          # 2. Trigger sync
+          # Trigger sync
           echo "🔄 Triggering sync..."
-          SYNC_RESPONSE=$(curl -k -s -X POST $ARGOCD_URL/api/v1/applications/url-shortener/sync \
-            -H "Authorization: Bearer $TOKEN" \
+          SYNC_RESPONSE=$(curl -k -s -X POST https://localhost:8080/api/v1/applications/url-shortener/sync \
+            -H "Authorization: Bearer $JWT_TOKEN" \
             -H "Content-Type: application/json" \
             -d '{}')
           
           echo "✅ Sync initiated"
           
-          # 3. Monitor
+          # Monitor sync progress
           echo ""
           echo "📊 DEPLOYMENT STATUS"
           echo "==================="
           
-          for i in {1..30}; do
-            # Get app status
-            APP_DATA=$(curl -k -s $ARGOCD_URL/api/v1/applications/url-shortener \
-              -H "Authorization: Bearer $TOKEN")
+          for i in {1..60}; do  # Increased to 60 attempts (10 minutes)
+            # Get application status
+            APP_DATA=$(curl -k -s https://localhost:8080/api/v1/applications/url-shortener \
+              -H "Authorization: Bearer $JWT_TOKEN")
             
-            # Extract status
             SYNC_STATUS=$(echo "$APP_DATA" | jq -r '.status.sync.status // "Unknown"')
             HEALTH_STATUS=$(echo "$APP_DATA" | jq -r '.status.health.status // "Unknown"')
             
-            # Display
-            printf "[%s] Attempt %2d/30 | Sync: %-10s | Health: %-10s\n" \
+            printf "[%s] Attempt %2d/60 | Sync: %-10s | Health: %-10s\n" \
               "$(date +%H:%M:%S)" "$i" "$SYNC_STATUS" "$HEALTH_STATUS"
             
-            # Check if sync completed
             if [ "$SYNC_STATUS" = "Synced" ]; then
               echo ""
               echo "🎉 DEPLOYMENT SUCCESSFUL"
               echo "Sync: $SYNC_STATUS"
               echo "Health: $HEALTH_STATUS"
+              
+              # Kill port-forward
+              kill $PORT_FORWARD_PID
               exit 0
             fi
             
@@ -394,5 +447,13 @@ jobs:
           done
           
           echo ""
-          echo "⏰ DEPLOYMENT TIMED OUT"
+          echo "⏰ DEPLOYMENT TIMED OUT (10 minutes)"
+          
+          # Show final pod status
+          echo ""
+          echo "📦 Final pod status in prod namespace:"
+          kubectl get pods -n prod
+          
+          # Kill port-forward
+          kill $PORT_FORWARD_PID
           exit 1
