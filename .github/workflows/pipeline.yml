@@ -294,7 +294,7 @@ jobs:
           argocd version --client
             # Update kubeconfig so kubectl can talk to your EKS cluster
       - name: Configure AWS via OIDC
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/eksAccessRole
           aws-region: ${{ env.AWS_REGION }}
