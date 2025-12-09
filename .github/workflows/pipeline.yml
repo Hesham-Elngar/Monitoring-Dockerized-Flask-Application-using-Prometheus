@@ -349,36 +349,60 @@ jobs:
       #     exit 1
 
 
-      - name: Deploy and Monitor
+      - name: Deploy Application
+        env:
+          ARGOCD_URL: ${{ secrets.ARGOCD_URL }}
+          ARGOCD_PASS: ${{ secrets.ARGOCD_PASSWORD }}
         run: |
-          # Get token
-          echo "Authenticating with ArgoCD..."
-          TOKEN=$(curl -k -s -X POST $ARGOCD_URL/api/v1/session \
+          # 1. Authenticate
+          echo "🔐 Authenticating..."
+          AUTH_RESPONSE=$(curl -k -s -X POST $ARGOCD_URL/api/v1/session \
             -d "{\"username\":\"admin\",\"password\":\"$ARGOCD_PASS\"}" \
-            -H "Content-Type: application/json" | jq -r '.token')
+            -H "Content-Type: application/json")
           
-          # Start sync
-          echo "Initiating sync..."
-          curl -k -s -X POST $ARGOCD_URL/api/v1/applications/url-shortener/sync \
-            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{}' > /dev/null
+          # Check if we got a valid response
+          if ! echo "$AUTH_RESPONSE" | jq -e '.token' > /dev/null 2>&1; then
+            echo "❌ Authentication failed"
+            echo "Response: $AUTH_RESPONSE"
+            exit 1
+          fi
           
-          # Monitor
+          TOKEN=$(echo "$AUTH_RESPONSE" | jq -r '.token')
+          echo "✅ Authenticated"
+          
+          # 2. Trigger sync
+          echo "🔄 Triggering sync..."
+          SYNC_RESPONSE=$(curl -k -s -X POST $ARGOCD_URL/api/v1/applications/url-shortener/sync \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          
+          echo "✅ Sync initiated"
+          
+          # 3. Monitor
           echo ""
-          echo "DEPLOYMENT STATUS"
-          echo "================="
+          echo "📊 DEPLOYMENT STATUS"
+          echo "==================="
           
           for i in {1..30}; do
-            DATA=$(curl -k -s $ARGOCD_URL/api/v1/applications/url-shortener -H "Authorization: Bearer $TOKEN")
-            SYNC=$(echo $DATA | jq -r '.status.sync.status')
-            HEALTH=$(echo $DATA | jq -r '.status.health.status')
+            # Get app status
+            APP_DATA=$(curl -k -s $ARGOCD_URL/api/v1/applications/url-shortener \
+              -H "Authorization: Bearer $TOKEN")
             
-            printf "%-10s %-15s %-10s\n" "[$(date +%H:%M:%S)]" "Sync: $SYNC" "Health: $HEALTH"
+            # Extract status
+            SYNC_STATUS=$(echo "$APP_DATA" | jq -r '.status.sync.status // "Unknown"')
+            HEALTH_STATUS=$(echo "$APP_DATA" | jq -r '.status.health.status // "Unknown"')
             
-            if [ "$SYNC" = "Synced" ]; then
+            # Display
+            printf "[%s] Attempt %2d/30 | Sync: %-10s | Health: %-10s\n" \
+              "$(date +%H:%M:%S)" "$i" "$SYNC_STATUS" "$HEALTH_STATUS"
+            
+            # Check if sync completed
+            if [ "$SYNC_STATUS" = "Synced" ]; then
               echo ""
-              echo "RESULT: SUCCESS"
-              echo "Sync Status: $SYNC"
-              echo "App Health: $HEALTH"
+              echo "🎉 DEPLOYMENT SUCCESSFUL"
+              echo "Sync: $SYNC_STATUS"
+              echo "Health: $HEALTH_STATUS"
               exit 0
             fi
             
@@ -386,5 +410,5 @@ jobs:
           done
           
           echo ""
-          echo "RESULT: TIMEOUT"
+          echo "⏰ DEPLOYMENT TIMED OUT"
           exit 1
