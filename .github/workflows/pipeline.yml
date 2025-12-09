@@ -292,10 +292,15 @@ jobs:
   
       - name: ArgoCD Sync
         run: |
-          argocd login ${{ secrets.ARGOCD_SERVER }} \
-            --username ${{ secrets.ARGOCD_USERNAME }} \
-            --password ${{ secrets.ARGOCD_TOKEN }} \
-            --insecure
+          # argocd login ${{ secrets.ARGOCD_SERVER }} \
+          #   --username ${{ secrets.ARGOCD_USERNAME }} \
+          #   --password ${{ secrets.ARGOCD_TOKEN }} \
+          #   --insecure
+          argocd login https://079f39abcc37.ngrok-free.app \
+            --username admin \
+            --password Hesham12345$ \
+            --insecure 
+            
 
           argocd app sync url-shortener
           argocd app wait url-shortener
